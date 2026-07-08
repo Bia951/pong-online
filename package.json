@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A rough old-browser Pong with Colyseus online multiplayer.",
   "main": "server/index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node server/index.js",
     "start": "node server/index.js",

@@ -77,11 +77,11 @@
 	<!-- START online menu -->
 	<div class="menu" id="online" style="display:none;">
 	  <div class="title">Online Multiplayer</div>
-	  <div class="button back" onclick="hide(this.parentNode);">Back</div>
-	  <div class="button" onclick="startOnline('quick');">Quick Match</div>
-	  <div class="button" onclick="startOnline('create');">Create Room</div>
+	  <div id="onlineBack" class="button back" onclick="hide(this.parentNode);">Back</div>
+	  <div id="onlineQuick" class="button" onclick="startOnline('quick');">Quick Match</div>
+	  <div id="onlineCreate" class="button" onclick="startOnline('create');">Create Room</div>
 	  <div class="row"><span class="label">Room Code : </span><input id="roomCode" class="box" type="text" /></div>
-	  <div class="button" onclick="startOnline('join');">Join Room</div>
+	  <div id="onlineJoin" class="button" onclick="startOnline('join');">Join Room</div>
 	  <div class="cell" id="onlineStatus">Start the Node server, then pick a match type.</div>
 	</div>
 	<!-- END online menu -->
@@ -105,7 +105,12 @@
 	  
 	  <div class="cell">
 	    <div class="sub title">Game Types</div>
-		There are two Game Types : One Player and CPU vs CPU. In One Player you play against a CPU, in CPU vs CPU you can sit back and watch the computers go at it.
+		There are three Game Types : One Player, CPU vs CPU, and Online Multiplayer. In One Player you play against a CPU, in CPU vs CPU you can sit back and watch the computers go at it, and in Online Multiplayer you play another person.
+	  </div>
+
+	  <div class="cell">
+	    <div class="sub title">Online Multiplayer</div>
+		Quick Match finds another waiting player. Create Room gives you a Room Code to share. Join Room connects to that code. Online mode needs the Node server running.
 	  </div>
 	
 	  <div class="cell">
@@ -162,12 +167,12 @@
 	  <div class="back button" onclick="hide(this.parentNode);">Back</div>
 	  <div class="cell">
 	    <div class="sub title">What is Browser Pong ?</div>
-		Browser Pong is pong in your browser, it's based off the original game for Atari. It's developed using HTML, CSS, and JavaScript.
+		Browser Pong is pong in your browser, it's based off the original game for Atari. It's developed using HTML, CSS, and JavaScript. This build adds rough two-player online mode with Quick Match and Room Codes.
 	  </div>
 	  
 	  <div class="cell">
 	    <div class="sub title">Compatibility</div>
-		It is recommended to play this game on a browser that is up to date supporting HTML5, CSS3, and JavaScript. Recommended browsers : Firefox, Google Chrome, Internet Explorer.
+		It is recommended to play this game on a browser that is up to date supporting HTML5, CSS3, and JavaScript. Recommended browsers : Firefox, Google Chrome, Internet Explorer. Online Multiplayer also needs the Node server.
 	  </div>
 	  
 	  <div class="cell">
@@ -181,7 +186,7 @@
 	    <div class="sub title">Credits</div>
 		Developer : <a href="https://github.com/SethClydesdale/browser-pong" target="_blank">Seth Clydesdale</a>
 		<br/>
-		Special thanks to my brother for the idea, and player feedback.
+		Online multiplayer build : <a href="https://github.com/Bia951/pong-online" target="_blank">Bia951/pong-online</a>
 	  </div>
 	</div>
 	<!-- END about -->
@@ -190,6 +195,14 @@
 	<div class="menu" id="notes" style="display:none;">
 	  <div class="title">Patch Notes</div>
 	  <div class="back button" onclick="hide(this.parentNode);">Back</div>
+	  <div class="cell">
+	    <div class="title">Online Build</div>
+	    <ul>
+		  <li>Added Online Multiplayer</li>
+		  <li>Added Quick Match and Room Code games</li>
+		  <li>Added a Node / Colyseus room server</li>
+		</ul>
+	  </div>
 	  <div class="cell">
 	    <div class="title">Version 1.02</div>
 	    <ul>

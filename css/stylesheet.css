@@ -194,8 +194,11 @@ input.box {
 
 #popupContent { padding:3px }
 .subMenu.alert .button {
-  width:50px;
+  display:inline-block;
+  min-width:50px;
+  width:auto;
   padding:3px;
+  white-space:nowrap;
 }
 
 #customAlert .button.small {

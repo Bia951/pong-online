@@ -364,15 +364,27 @@ var online = {
   lastSent : { up:false, down:false, turbo:false },
   lastState : null,
   lastEventSeq : 0,
-  gameOverShown : false
+  gameOverShown : false,
+  requestId : 0,
+  busy : false
 };
 
 function startOnline(type) {
-  if (online.room) online.room.leave();
+  if (online.busy) return;
+  var requestId = ++online.requestId;
+
+  if (online.room) {
+    online.room.leave();
+    online.room = null;
+  }
+
+  setOnlineBusy(true);
   onlineStatus('Connecting...');
 
   if (location.protocol == 'file:' || !window.Colyseus) {
     onlineStatus('Online needs the Node server. Run npm run dev and open http://127.0.0.1:2567/');
+    setOnlineBusy(false);
+    showOnlineBack();
     return;
   }
 
@@ -382,18 +394,32 @@ function startOnline(type) {
   if (type == 'create') request = client.create('pong', { private:true });
   if (type == 'join') {
     var roomCode = getId('roomCode').value.replace(/\s/g, '');
-    if (!roomCode) return onlineStatus('Type a Room Code first.');
+    if (!roomCode) {
+      onlineStatus('Type a Room Code first.');
+      setOnlineBusy(false);
+      showOnlineBack();
+      return;
+    }
     request = client.joinById(roomCode);
   }
 
+  hideOnlineBack();
+
   request.then(function(room) {
-    setupOnlineRoom(room);
+    if (requestId != online.requestId) {
+      room.leave();
+      return;
+    }
+    setupOnlineRoom(room, requestId);
   }).catch(function(error) {
+    if (requestId != online.requestId) return;
     onlineStatus('Connection failed : ' + (error.message || error));
+    setOnlineBusy(false);
+    showOnlineBack();
   });
 };
 
-function setupOnlineRoom(room) {
+function setupOnlineRoom(room, requestId) {
   online.room = room;
   online.side = '';
   online.keys = { up:false, down:false, turbo:false };
@@ -406,6 +432,7 @@ function setupOnlineRoom(room) {
   onlineStatus('Room Code : ' + room.roomId + '<br/>Waiting for seat...');
 
   room.onMessage('joined', function(message) {
+    if (!isCurrentOnlineRoom(room, requestId)) return;
     online.side = message.side;
     started = true;
     hide(getId('main-info'));
@@ -416,15 +443,23 @@ function setupOnlineRoom(room) {
   });
 
   room.onMessage('state', function(state) {
+    if (!isCurrentOnlineRoom(room, requestId)) return;
     renderOnlineState(state);
   });
 
   room.onMessage('error', function(message) {
+    if (!isCurrentOnlineRoom(room, requestId)) return;
     onlineStatus(message.message || 'Server error.');
   });
 
   room.onLeave(function() {
-    if (!online.gameOverShown) onlineStatus('Disconnected.');
+    if (!isCurrentOnlineRoom(room, requestId)) return;
+    online.room = null;
+    setOnlineBusy(false);
+    if (!online.gameOverShown) {
+      onlineStatus('Disconnected.');
+      showOnlineBack();
+    }
   });
 };
 
@@ -558,6 +593,7 @@ function playOnlineEvent(state) {
 function showOnlineGameOver(state) {
   if (online.gameOverShown) return;
   online.gameOverShown = true;
+  setOnlineBusy(false);
 
   if (state.message == 'Opponent left') {
     domAlert('Online Multiplayer', 'Opponent left', '<div class="button" onclick="window.location.reload()">Back to main menu</div>');
@@ -580,6 +616,36 @@ function showOnlineGameOver(state) {
 
 function onlineStatus(message) {
   getId('onlineStatus').innerHTML = message;
+};
+
+function hideOnlineBack() {
+  if (getId('onlineBack')) hide(getId('onlineBack'));
+};
+
+function showOnlineBack() {
+  if (getId('onlineBack')) show(getId('onlineBack'));
+};
+
+function setOnlineBusy(busy) {
+  online.busy = busy;
+  for (var i=0, ids=['onlineQuick','onlineCreate','onlineJoin']; i<ids.length; i++) {
+    var action = getId(ids[i]);
+    if (!action) continue;
+    action.style.pointerEvents = busy ? 'none' : '';
+    action.className = busy ? addClass(action.className, 'disabled') : removeClass(action.className, 'disabled');
+  }
+};
+
+function isCurrentOnlineRoom(room, requestId) {
+  return online.room == room && online.requestId == requestId;
+};
+
+function addClass(className, name) {
+  return new RegExp('(^|\\s)' + name + '(\\s|$)').test(className) ? className : className + ' ' + name;
+};
+
+function removeClass(className, name) {
+  return className.replace(new RegExp('(^|\\s)' + name + '(\\s|$)', 'g'), ' ').replace(/^\s+|\s+$/g, '');
 };
 
 function onlineEndpoint() {
