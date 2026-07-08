@@ -356,6 +356,248 @@ function startGame(type, mode) {
   function sY() { return Number(ball.el.className.replace(/.*?_Y(\d+)/,'$1')) }
 };
 
+var online = {
+  room : null,
+  side : '',
+  elements : null,
+  keys : { up:false, down:false, turbo:false },
+  lastSent : { up:false, down:false, turbo:false },
+  lastState : null,
+  lastEventSeq : 0,
+  gameOverShown : false
+};
+
+function startOnline(type) {
+  if (online.room) online.room.leave();
+  onlineStatus('Connecting...');
+
+  if (location.protocol == 'file:' || !window.Colyseus) {
+    onlineStatus('Online needs the Node server. Run npm run dev and open http://127.0.0.1:2567/');
+    return;
+  }
+
+  var client = new Colyseus.Client(onlineEndpoint()), request;
+
+  if (type == 'quick') request = client.joinOrCreate('pong', { mode:'quick' });
+  if (type == 'create') request = client.create('pong', { private:true });
+  if (type == 'join') {
+    var roomCode = getId('roomCode').value.replace(/\s/g, '');
+    if (!roomCode) return onlineStatus('Type a Room Code first.');
+    request = client.joinById(roomCode);
+  }
+
+  request.then(function(room) {
+    setupOnlineRoom(room);
+  }).catch(function(error) {
+    onlineStatus('Connection failed : ' + (error.message || error));
+  });
+};
+
+function setupOnlineRoom(room) {
+  online.room = room;
+  online.side = '';
+  online.keys = { up:false, down:false, turbo:false };
+  online.lastSent = { up:false, down:false, turbo:false };
+  online.lastState = null;
+  online.lastEventSeq = 0;
+  online.gameOverShown = false;
+
+  getId('roomCode').value = room.roomId;
+  onlineStatus('Room Code : ' + room.roomId + '<br/>Waiting for seat...');
+
+  room.onMessage('joined', function(message) {
+    online.side = message.side;
+    started = true;
+    hide(getId('main-info'));
+    show(getId('UI'));
+    createOnlineElements();
+    bindOnlineControls();
+    onlineStatus('Room Code : ' + message.roomId + '<br/>You are Player ' + (online.side == 'left' ? '1' : '2') + '. Waiting for opponent...');
+  });
+
+  room.onMessage('state', function(state) {
+    renderOnlineState(state);
+  });
+
+  room.onMessage('error', function(message) {
+    onlineStatus(message.message || 'Server error.');
+  });
+
+  room.onLeave(function() {
+    if (!online.gameOverShown) onlineStatus('Disconnected.');
+  });
+};
+
+function renderOnlineState(state) {
+  online.lastState = state;
+  createOnlineElements();
+
+  if (state.phase == 'playing') {
+    hideMenus();
+  } else if (state.phase == 'waiting') {
+    show(getId('online'));
+    onlineStatus('Room Code : ' + state.roomId + '<br/>' + state.message);
+  }
+
+  moveOnlineSprite(online.elements.left, state.paddles.left.x, state.paddles.left.y, state.paddles.left.width, state.paddles.left.height);
+  moveOnlineSprite(online.elements.right, state.paddles.right.x, state.paddles.right.y, state.paddles.right.width, state.paddles.right.height);
+  moveOnlineSprite(online.elements.ball, state.ball.x, state.ball.y, state.ball.size, state.ball.size);
+  syncOnlineUI(state);
+  playOnlineEvent(state);
+
+  if (state.phase == 'ended') showOnlineGameOver(state);
+};
+
+function createOnlineElements() {
+  if (online.elements) return;
+
+  var left = document.createElement('IMG'),
+      right = document.createElement('IMG'),
+      ball = document.createElement('IMG');
+
+  left.src = custom.paddle;
+  right.src = custom.paddle;
+  ball.src = custom.ball;
+
+  if (custom.color != 'none') {
+    left.style.background = custom.color;
+    right.style.background = custom.color;
+    ball.style.background = custom.color;
+  }
+
+  left.className = 'paddle p1';
+  right.className = 'paddle p2';
+  ball.className = custom.id == 'customBall' ? 'customBall' : 'ball';
+
+  document.body.insertBefore(ball, document.body.firstChild);
+  document.body.insertBefore(right, document.body.firstChild);
+  document.body.insertBefore(left, document.body.firstChild);
+
+  online.elements = {
+    left : left,
+    right : right,
+    ball : ball
+  };
+};
+
+function bindOnlineControls() {
+  document.onkeydown = function(e) {
+    if (onlineKey(e, true)) e.preventDefault();
+  };
+
+  document.onkeyup = function(e) {
+    if (onlineKey(e, false)) e.preventDefault();
+  };
+};
+
+function onlineKey(e, down) {
+  var key = e.key ? e.key.toLowerCase().replace(/arrow/, '') : e.which || e.keyCode,
+      handled = false;
+
+  if (key == 'up' || key == 'w' || key == 38 || key == 87) {
+    online.keys.up = down;
+    handled = true;
+  }
+  if (key == 'down' || key == 's' || key == 40 || key == 83) {
+    online.keys.down = down;
+    handled = true;
+  }
+  if (key == 'shift' || key == 16) {
+    online.keys.turbo = down;
+    handled = true;
+  }
+
+  if (handled) sendOnlineInput();
+  return handled;
+};
+
+function sendOnlineInput() {
+  if (!online.room) return;
+  if (online.keys.up == online.lastSent.up && online.keys.down == online.lastSent.down && online.keys.turbo == online.lastSent.turbo) return;
+
+  online.lastSent = {
+    up : online.keys.up,
+    down : online.keys.down,
+    turbo : online.keys.turbo
+  };
+  online.room.send('input', online.lastSent);
+};
+
+function moveOnlineSprite(el, x, y, w, h) {
+  var sx = window.innerWidth / 900,
+      sy = window.innerHeight / 550;
+
+  el.style.left = Math.floor(x * sx) + 'px';
+  el.style.top = Math.floor(y * sy) + 'px';
+  el.style.width = Math.max(3, Math.floor(w * sx)) + 'px';
+  el.style.height = Math.max(3, Math.floor(h * sy)) + 'px';
+};
+
+function syncOnlineUI(state) {
+  getId('p1').innerHTML = state.scores.left;
+  getId('p2').innerHTML = state.scores.right;
+  getId('chain').innerHTML = state.chain;
+  getId('bestChain').innerHTML = state.bestChain;
+
+  var chainLevel = 'zeroChain';
+  if (state.chain >= 1) chainLevel = 'goodChain';
+  if (state.chain >= 25) chainLevel = 'greatChain';
+  if (state.chain >= 50) chainLevel = 'superChain';
+  getId('chain').className = chainLevel;
+};
+
+function playOnlineEvent(state) {
+  if (!state.event || state.eventSeq == online.lastEventSeq) return;
+  online.lastEventSeq = state.eventSeq;
+
+  if (state.event == 'hit') sfx('hitfx');
+  if (state.event == 'wall') sfx('collfx');
+  if (state.event == 'goal' || state.event == 'gameover') sfx('goalfx');
+};
+
+function showOnlineGameOver(state) {
+  if (online.gameOverShown) return;
+  online.gameOverShown = true;
+
+  if (state.message == 'Opponent left') {
+    domAlert('Online Multiplayer', 'Opponent left', '<div class="button" onclick="window.location.reload()">Back to main menu</div>');
+    return;
+  }
+
+  var winner = 'Draw !';
+  if (state.winner == online.side) winner = 'You won !';
+  else if (state.winner) winner = 'Opponent won !';
+
+  getId('gameWinner').innerHTML = winner;
+  getId('gameType').innerHTML = '<span class="label">Game Type&nbsp;</span><span class="value">Online Multiplayer</span>';
+  getId('gameMode').innerHTML = '<span class="label">Room&nbsp;</span><span class="value">' + state.roomId + '</span>';
+  getId('gameScore1').innerHTML = '<span class="label">Player 1 Score&nbsp;</span><span class="value">' + state.scores.left + '</span>';
+  getId('gameScore2').innerHTML = '<span class="label">Player 2 Score&nbsp;</span><span class="value">' + state.scores.right + '</span>';
+  getId('maxChain').innerHTML = '<span class="label">Best Chain&nbsp;</span><span class="value">' + state.bestChain + '</span>';
+
+  show(getId('gameOver'));
+};
+
+function onlineStatus(message) {
+  getId('onlineStatus').innerHTML = message;
+};
+
+function onlineEndpoint() {
+  return (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host;
+};
+
+function hideMenus() {
+  for (var i=0, menus=document.getElementsByTagName('DIV'); i<menus.length; i++) if (/menu/.test(menus[i].className)) hide(menus[i]);
+};
+
+window.addEventListener('resize', function() {
+  if (online.lastState) renderOnlineState(online.lastState);
+});
+
+window.addEventListener('beforeunload', function() {
+  if (online.room) online.room.leave();
+});
+
 
 // pauses the game and shows the pause menu
 function pause() {
@@ -422,7 +664,12 @@ function domAlert(title, message, custom) {
   show(getId('popup'));
 };
 
-function sfx(audio) { getId(audio).play() };
+function sfx(audio) {
+  var sound = getId(audio);
+  if (!sound) return;
+  var played = sound.play();
+  if (played && played.catch) played.catch(function() {});
+};
 function getId(id) { return document.getElementById(id) };
 function show() { for (var i=0,args=arguments; i<args.length; i++) args[i].style.display = '' };
 function hide() { for (var i=0,args=arguments; i<args.length; i++) args[i].style.display = 'none' };

@@ -1,0 +1,17 @@
+{
+  "name": "browser-pong-online",
+  "version": "1.0.0",
+  "description": "A rough old-browser Pong with Colyseus online multiplayer.",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@colyseus/schema": "4.0.27",
+    "@colyseus/sdk": "0.17.43",
+    "colyseus": "0.17.10",
+    "express": "5.2.1"
+  }
+}

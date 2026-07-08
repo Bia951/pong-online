@@ -27,6 +27,7 @@
       <div class="title">Main menu</div>
       <div class="button" onclick="show(getId('difficulty'));getId('modeList').className='mode_0';">One Player</div>
       <div class="button" onclick="show(getId('difficulty'));getId('modeList').className='mode_1';">CPU vs CPU</div>
+      <div class="button" onclick="show(getId('online'));">Online Multiplayer</div>
       <div class="button" onclick="show(getId('instructions'));">Instructions</div>
       <div class="button" onclick="show(getId('customize'));">Customize</div>
       <div class="button" onclick="show(getId('about'));">About</div>
@@ -72,6 +73,18 @@
 	  </div>
 	</div>
 	<!-- END difficulty menu -->
+
+	<!-- START online menu -->
+	<div class="menu" id="online" style="display:none;">
+	  <div class="title">Online Multiplayer</div>
+	  <div class="button back" onclick="hide(this.parentNode);">Back</div>
+	  <div class="button" onclick="startOnline('quick');">Quick Match</div>
+	  <div class="button" onclick="startOnline('create');">Create Room</div>
+	  <div class="row"><span class="label">Room Code : </span><input id="roomCode" class="box" type="text" /></div>
+	  <div class="button" onclick="startOnline('join');">Join Room</div>
+	  <div class="cell" id="onlineStatus">Start the Node server, then pick a match type.</div>
+	</div>
+	<!-- END online menu -->
 	
 	<!-- START instructions -->
 	<div class="menu" id="instructions" style="display:none;">
@@ -248,6 +261,7 @@
 	</div>
 	<!-- END audio -->
 	
+	<script src="vendor/colyseus.js" type="text/javascript"></script>
 	<script src="javascript/engine.js" type="text/javascript"></script>
   </body>
 </html>
