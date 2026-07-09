@@ -1,4 +1,4 @@
-const { Room } = require('colyseus');
+const { Room } = require('@colyseus/core');
 const {
   addPlayer,
   createGameState,

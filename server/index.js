@@ -1,5 +1,6 @@
 const path = require('node:path');
-const { Server, WebSocketTransport } = require('colyseus');
+const { Server } = require('@colyseus/core');
+const { WebSocketTransport } = require('@colyseus/ws-transport');
 const express = require('express');
 const { PongRoom } = require('./PongRoom');
 

@@ -649,7 +649,20 @@ function removeClass(className, name) {
 };
 
 function onlineEndpoint() {
-  return (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host;
+  return (location.protocol == 'https:' ? 'wss://' : 'ws://') + location.host + onlineBasePath(location.pathname);
+};
+
+function onlineBasePath(pathname) {
+  pathname = pathname || '/';
+  if (pathname == '/') return '';
+
+  if (pathname.charAt(pathname.length - 1) == '/') {
+    pathname = pathname.slice(0, -1);
+  } else if (/\.[^\/]+$/.test(pathname)) {
+    pathname = pathname.replace(/\/[^\/]*$/, '');
+  }
+
+  return pathname == '/' ? '' : pathname;
 };
 
 function hideMenus() {

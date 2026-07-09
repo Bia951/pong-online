@@ -12,9 +12,9 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@colyseus/schema": "4.0.27",
+    "@colyseus/core": "0.17.44",
     "@colyseus/sdk": "0.17.43",
-    "colyseus": "0.17.10",
+    "@colyseus/ws-transport": "0.17.13",
     "express": "5.2.1"
   }
 }
