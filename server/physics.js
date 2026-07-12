@@ -12,6 +12,7 @@ const BALL_BASE_SPEED = 300;
 const BALL_CHAIN_BOOST = 16;
 const BALL_MAX_SPEED = 680;
 const SERVE_DELAY = 1;
+const MAX_BALL_STEP = BALL_SIZE / 2;
 
 function createGameState() {
   return {
@@ -125,12 +126,7 @@ function stepGame(state, deltaSeconds) {
     return;
   }
 
-  state.ball.x += state.ball.vx * deltaSeconds;
-  state.ball.y += state.ball.vy * deltaSeconds;
-
-  collideWalls(state);
-  collidePaddles(state);
-  scoreGoals(state);
+  advanceBall(state, deltaSeconds);
 }
 
 function serializeState(state) {
@@ -192,6 +188,23 @@ function movePaddle(state, side, deltaSeconds) {
   if (input.down && !input.up) state.paddles[key] += speed * deltaSeconds;
 
   state.paddles[key] = clamp(state.paddles[key], 0, ARENA_HEIGHT - PADDLE_HEIGHT);
+}
+
+function advanceBall(state, deltaSeconds) {
+  var distance = Math.max(Math.abs(state.ball.vx), Math.abs(state.ball.vy)) * deltaSeconds;
+  var steps = Math.max(1, Math.ceil(distance / MAX_BALL_STEP));
+  var stepSeconds = deltaSeconds / steps;
+
+  for (var i=0; i<steps; i++) {
+    state.ball.x += state.ball.vx * stepSeconds;
+    state.ball.y += state.ball.vy * stepSeconds;
+
+    collideWalls(state);
+    collidePaddles(state);
+    scoreGoals(state);
+
+    if (state.phase !== 'playing' || state.serveTimer > 0) break;
+  }
 }
 
 function collideWalls(state) {

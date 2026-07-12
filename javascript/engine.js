@@ -46,6 +46,8 @@ function startGame(type, mode) {
       player1 = new Paddle('p1'),
       player2 = new Paddle('p2'),
 	  controls_p1 = 'idle',
+	  localKeys = { up:false, down:false, turbo:false },
+	  controlTimer = null,
 	  difficulty = [ 1,1 ], gameEnded = false;
 	  
 	  
@@ -193,41 +195,47 @@ function startGame(type, mode) {
     if (!paused && keyId == p) pause(), pD();
     else if (paused && keyId == p) resume(), pD();
   
-    if (type == 1) return; // we ignore input if the mode is CPU vs CPU
-	
-	// up and down movement keys
-	if (e.shiftKey) {
-	  if (keyId == up || keyId == w) playerControl('up', true), pD();
-	  if (keyId == down || keyId == s) playerControl('down', true), pD();
-	} else {
-	  if (keyId == up || keyId == w) playerControl('up', false), pD();
-	  if (keyId == down || keyId == s) playerControl('down', false), pD();
-	}
+	if (type == 1) return; // we ignore input if the mode is CPU vs CPU
+
+	if (keyId == up || keyId == w) localKeys.up = true, updatePlayerControl(), pD();
+	if (keyId == down || keyId == s) localKeys.down = true, updatePlayerControl(), pD();
+	if (keyId == 'shift' || keyId == 16) localKeys.turbo = true, updatePlayerControl(), pD();
 	function pD() { e.preventDefault() }
   };
-  
-  document.onkeyup = function() { controls_p1 = 'idle' }
-  
-  // main movement of the player
-  function playerControl(last, turbo) {
-    if (controls_p1 == last) return;
-    controls_p1 = last;
-	move();
 
-	// we use an interval so the controls are more responsive
-	// without there's usually a delay while holding the button
-    var controls = window.setInterval(function() {
-      if (controls_p1 != last || paused) return window.clearInterval(controls);
-      move();
-	},turbo ? 1:cNum('sens',25));
-	
-	function move() {
-	  if (controls_p1 == 'up') player1.up();
-      if (controls_p1 == 'down') player1.down();
-	   // adds some boundaries so the player doesn't move off screen
-	  if (getY(player1.el) < 0) player1.setCoords(50,0);
-	  if (getY(player1.el) > wY - 100) player1.setCoords(50,wY - 100);
-	}
+  document.onkeyup = function(e) {
+    var keyId = e.key ? e.key.toLowerCase().replace(/arrow/, '') : e.which || e.keyCode,
+        handled = false;
+
+    if (keyId == 'up' || keyId == 'w' || keyId == 38 || keyId == 87) localKeys.up = false, handled = true;
+    if (keyId == 'down' || keyId == 's' || keyId == 40 || keyId == 83) localKeys.down = false, handled = true;
+    if (keyId == 'shift' || keyId == 16) localKeys.turbo = false, handled = true;
+    if (handled) updatePlayerControl(), e.preventDefault();
+  };
+
+  window.addEventListener('blur', function() {
+    localKeys = { up:false, down:false, turbo:false };
+    updatePlayerControl();
+  });
+
+  // main movement of the player
+  function updatePlayerControl() {
+    window.clearInterval(controlTimer);
+    controlTimer = null;
+    controls_p1 = localKeys.up == localKeys.down ? 'idle' : (localKeys.up ? 'up' : 'down');
+    if (controls_p1 == 'idle') return;
+
+    movePlayer();
+    controlTimer = window.setInterval(movePlayer, localKeys.turbo ? 1:cNum('sens',25));
+  };
+
+  function movePlayer() {
+    if (gameEnded) return window.clearInterval(controlTimer);
+    if (paused) return;
+    if (controls_p1 == 'up') player1.up();
+    if (controls_p1 == 'down') player1.down();
+    if (getY(player1.el) < 0) player1.setCoords(50,0);
+    if (getY(player1.el) > wY - 100) player1.setCoords(50,wY - 100);
   };
   
   /* -- START CPU -- */
@@ -266,7 +274,7 @@ function startGame(type, mode) {
 	// the speed is randomized every second
 	window.setTimeout(function() {
 	  window.clearInterval(CPU);
-      initCPU(o, ref, n, t);
+      if (!gameEnded) initCPU(o, ref, n, t);
 	},1000);
   }
   /* -- END CPU -- */
@@ -404,6 +412,7 @@ function startOnline(type) {
   }
 
   hideOnlineBack();
+  showOnlineCancel();
 
   request.then(function(room) {
     if (requestId != online.requestId) {
@@ -415,8 +424,35 @@ function startOnline(type) {
     if (requestId != online.requestId) return;
     onlineStatus('Connection failed : ' + (error.message || error));
     setOnlineBusy(false);
+    hideOnlineCancel();
     showOnlineBack();
   });
+};
+
+function cancelOnline() {
+  var room = online.room;
+
+  online.requestId += 1;
+  online.keys = { up:false, down:false, turbo:false };
+  online.lastSent = { up:false, down:false, turbo:false };
+  online.room = null;
+  online.side = '';
+  online.lastState = null;
+  online.lastEventSeq = 0;
+  online.gameOverShown = false;
+  started = false;
+
+  if (room) room.leave();
+
+  removeOnlineElements();
+  document.onkeydown = null;
+  document.onkeyup = null;
+  hide(getId('UI'));
+  show(getId('main-info'));
+  setOnlineBusy(false);
+  hideOnlineCancel();
+  showOnlineBack();
+  onlineStatus('Matchmaking cancelled.');
 };
 
 function setupOnlineRoom(room, requestId) {
@@ -456,6 +492,7 @@ function setupOnlineRoom(room, requestId) {
     if (!isCurrentOnlineRoom(room, requestId)) return;
     online.room = null;
     setOnlineBusy(false);
+    hideOnlineCancel();
     if (!online.gameOverShown) {
       onlineStatus('Disconnected.');
       showOnlineBack();
@@ -515,6 +552,16 @@ function createOnlineElements() {
   };
 };
 
+function removeOnlineElements() {
+  if (!online.elements) return;
+
+  var elements = [online.elements.left, online.elements.right, online.elements.ball];
+  for (var i=0; i<elements.length; i++) {
+    if (elements[i] && elements[i].parentNode) elements[i].parentNode.removeChild(elements[i]);
+  }
+  online.elements = null;
+};
+
 function bindOnlineControls() {
   document.onkeydown = function(e) {
     if (onlineKey(e, true)) e.preventDefault();
@@ -546,9 +593,9 @@ function onlineKey(e, down) {
   return handled;
 };
 
-function sendOnlineInput() {
+function sendOnlineInput(force) {
   if (!online.room) return;
-  if (online.keys.up == online.lastSent.up && online.keys.down == online.lastSent.down && online.keys.turbo == online.lastSent.turbo) return;
+  if (!force && online.keys.up == online.lastSent.up && online.keys.down == online.lastSent.down && online.keys.turbo == online.lastSent.turbo) return;
 
   online.lastSent = {
     up : online.keys.up,
@@ -556,6 +603,11 @@ function sendOnlineInput() {
     turbo : online.keys.turbo
   };
   online.room.send('input', online.lastSent);
+};
+
+function resetOnlineInput(force) {
+  online.keys = { up:false, down:false, turbo:false };
+  sendOnlineInput(force);
 };
 
 function moveOnlineSprite(el, x, y, w, h) {
@@ -594,6 +646,7 @@ function showOnlineGameOver(state) {
   if (online.gameOverShown) return;
   online.gameOverShown = true;
   setOnlineBusy(false);
+  hideOnlineCancel();
 
   if (state.message == 'Opponent left') {
     domAlert('Online Multiplayer', 'Opponent left', '<div class="button" onclick="window.location.reload()">Back to main menu</div>');
@@ -624,6 +677,14 @@ function hideOnlineBack() {
 
 function showOnlineBack() {
   if (getId('onlineBack')) show(getId('onlineBack'));
+};
+
+function hideOnlineCancel() {
+  if (getId('onlineCancel')) hide(getId('onlineCancel'));
+};
+
+function showOnlineCancel() {
+  if (getId('onlineCancel')) show(getId('onlineCancel'));
 };
 
 function setOnlineBusy(busy) {
@@ -672,6 +733,16 @@ function hideMenus() {
 window.addEventListener('resize', function() {
   if (online.lastState) renderOnlineState(online.lastState);
 });
+
+window.addEventListener('blur', function() {
+  resetOnlineInput();
+});
+
+if (document.addEventListener) {
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) resetOnlineInput();
+  });
+}
 
 window.addEventListener('beforeunload', function() {
   if (online.room) online.room.leave();

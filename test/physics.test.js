@@ -71,6 +71,25 @@ test('scores and ends the game at the score cap', function() {
   assert.equal(state.winner, 'left');
 });
 
+test('does not let a fast ball tunnel through a paddle during a delayed tick', function() {
+  const state = createGameState();
+  addPlayer(state, 'a');
+  addPlayer(state, 'b');
+
+  state.serveTimer = 0;
+  state.ball.x = 70;
+  state.ball.y = state.paddles.leftY + 20;
+  state.ball.vx = -680;
+  state.ball.vy = 0;
+
+  stepGame(state, 0.1);
+
+  assert.equal(state.scores.right, 0);
+  assert.equal(state.event, 'hit');
+  assert.equal(state.chain, 1);
+  assert.ok(state.ball.vx > 0);
+});
+
 test('marks opponent as left when a player disconnects', function() {
   const state = createGameState();
   addPlayer(state, 'a');
